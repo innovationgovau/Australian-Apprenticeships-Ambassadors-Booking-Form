@@ -1,0 +1,68 @@
+<?php
+
+/**
+ * Implements hook_schema()
+ **/
+
+function apprenticeships_ambassadors_form_schema() {
+	$schema['apprenticeships_ambassadors_form'] = array(
+		'description' => 'A table to store data on form submissions. It only holds a time stamp, IP address, company and reference number.',
+		'fields' => array(
+			'form_id' => array(
+				'description' => 'The count of the form. used to create the reference number.',
+				'type' => 'serial',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+			),
+			'time_stamp' => array(
+				'description' => 'Unix timestamp of the form entry.',
+				'type' => 'int',
+				'not null' => TRUE,
+				'default' => 0,
+			),
+			'ip_address' => array(
+				'description' => 'IP Address of the computer used to enter the form.',
+				'type' => 'varchar',
+				'length' => 40,
+				'not null' => TRUE,
+				'default' => '',
+			),
+			'organisation' => array(
+				'description' => 'Name of the organisation.',
+				'type' => 'varchar',
+				'length' => 255,
+				'not null' => TRUE,
+				'default' => '',
+			),
+			'reference' => array(
+				'description' => 'A basic reference number used to refer to particular form entries.',
+				'type' => 'varchar',
+				'length' => 10,
+				'not null' => TRUE,
+				'default' => '',
+			),
+		),
+		'primary key' => array('form_id'),
+	);
+	return $schema;
+}
+
+/**
+ * Implements hook_install()
+ **/
+
+function apprenticeships_ambassadors_form_install() {
+	if(!db_table_exists('apprenticeships_ambassadors_form')) {
+		drupal_install_schema('apprenticeships_ambassadors_form');
+	}
+}
+
+/**
+ * Implements hook_uninstall()
+ **/
+
+function apprenticeships_ambassadors_form_uninstall() {
+	if(db_table_exists('apprenticeships_ambassadors_form')) {
+		drupal_uninstall_schema('apprenticeships_ambassadors_form');
+	}
+}

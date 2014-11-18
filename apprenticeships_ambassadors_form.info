@@ -1,0 +1,6 @@
+name = Apprenticeships Ambassadors Form
+description = This custom module provides form elements for the Australian Apprenticeships Ambassadors form.
+core = 7.x
+dependencies[] = views
+dependencies[] = date
+dependencies[] = mimemail

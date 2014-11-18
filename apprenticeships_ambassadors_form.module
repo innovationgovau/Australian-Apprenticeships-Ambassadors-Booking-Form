@@ -1,0 +1,371 @@
+<?php
+
+/** 
+ * Implements hook_menu()
+ */
+function apprenticeships_ambassadors_form_menu() {
+  $items = array();
+  $items['request-an-ambassador'] = array(
+    'title' => 'Book an Australian Apprenticeships Ambassador',
+    'page callback' => '_call_form',
+    'access arguments' => array('access ambassadors request list'),
+    'description' => 'Australian Appprenticeships Ambassador Request Form',
+    'type' => MENU_CALLBACK,
+  );
+  $items['request-an-ambassador/submissions'] = array(
+    'title' => 'List of Ambassador requests',
+    'page callback' => '_request_list_builder',
+    'access arguments' => array('access administration menu'),
+    'description' => 'List of requests for an Australian Apprenticeships Ambassador',
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_permission()
+ **/
+
+function apprenticeships_ambassadors_form_permission() {
+  return array(
+    'access ambassadors request form' => array(
+      'title' => t('Access Ambassadors Request form'),
+      'description' => t('Allow users to access the Apprenticeships Ambassadors request form.'),
+    ),
+    'access ambassadors request list' => array(
+      'title' => t('Access Ambassadors Request list'),
+      'description' => t('Allow users to access the list of Apprenticeships Ambassadors requests.'),
+    ),
+  );
+}
+
+function _call_form() {
+  return drupal_get_form('_form_builder');
+}
+
+function _request_list_builder() {
+  $content = array(
+    'intro' => array(
+      '#markup' => t('<p>The following is a list of requests for an ambassador made through the request form.</p>'),
+    ),
+    'table' => array(
+      '#theme' => 'table',
+      '#header' => array(
+        t('Time'),
+        t('IP'),
+        t('Organisation'),
+        t('Reference'),
+      ),
+      '#rows' => array(),
+      '#empty' => t('There are no submission currently in the database.'),
+    ),
+  );
+  $result = db_select('apprenticeships_ambassadors_form')
+    ->fields('apprenticeships_ambassadors_form', array('time_stamp', 'ip_address', 'organisation', 'reference'))
+    ->orderBy('time_stamp', 'DESC')
+    ->execute();
+
+  foreach($result as $row) {
+    $row = (array) $row;
+    $date = format_date($row['time_stamp'], 'custom', 'H:i:s d/m/y');
+    $content['table']['#rows'][] = array(
+      'cell1' => $date,
+      'cell2' => $row['ip_address'],
+      'cell3' => $row['organisation'],
+      'cell4' => $row['reference'],
+    );
+  }
+  return $content;
+}
+
+/**
+ * Implements hook_theme()
+ *
+ * Supplies a template for the emails.
+ */
+
+function apprenticeships_ambassadors_form_theme() {
+  $path = drupal_get_path('module', 'apprenticeships_ambassadors_form') . '/templates';
+
+  return array(
+    'apprenticeships_ambassadors_form' => array(
+      'variables' => array('module' => NULL, 'key' => NULL, 'recipient' => NULL, 'subject' => NULL, 'body' => NULL),
+      'template' => 'apprenticeships_ambassadors_form_mail',
+      'pattern' => 'apprenticeships_ambassadors_form_mail__',
+      'mail theme' => TRUE,
+      'path' => $path,
+    ),
+  );
+}
+
+/**
+ * Custom callback function to execute the correct view and return the list of ambassadors.
+ */
+
+function _ambassadors_get_list() {
+  $view_check = views_get_view_result('ambassadors_list');
+  if (isset($view_check[0])) {
+    $view = views_get_view('ambassadors_list', true);
+    $view->set_items_per_page(0); // Ensure any paging is turned off.
+    $view->execute();
+    $items = array();
+
+    foreach ($view->result as $item) {
+      $full_node = node_load($item->nid);
+      $name = field_get_items('node', $full_node, 'field_ambassador_name');
+      $field = field_view_value('node', $full_node, 'field_ambassador_name', $name[0]);
+      // Ensure that empty fields are not displayed.
+      if (!empty($field['#markup'])) {
+        $items[$item->nid] = render($field);
+      }
+    }
+    sort($items);
+
+    // Add an extra item for 'Unsure'. We do this here rather than in the Forms API because the system will not recognise it as a legitimate item and instead use the first row returned by the view.
+    array_unshift($items, t('Unsure - like to discuss'));
+    return $items;
+  } else {
+    drupal_set_message('No view exists. Please ensure the correct view is available.', 'error');
+  }
+}
+
+/**
+ * Callback function for the form.
+ */
+
+function _form_builder($form_state) {
+
+  $ambassadors = drupal_map_assoc(_ambassadors_get_list());
+
+  $date_format = 'd-F-Y';
+  $date = format_date(time(), 'custom', 'H:i:s d/m/y');
+  $date_default = $date . '1 day';
+
+
+  $form['ambassador_name'] = array(
+    '#type' => 'select',
+    '#title' => t('Ambassador'),
+    '#description' => t('Please select the Ambassador you wish to book.'),
+    '#options' => $ambassadors,
+    '#required' => TRUE,
+  );
+
+  $form['name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Name'),
+    '#description' => t('Please enter your name.'),
+    '#size' => 20,
+    '#maxlength' => 40,
+    '#required' => TRUE,
+    '#attributes' => array(
+      'placeholder' => t('Enter your name'),
+    ),
+  );
+
+  $form['email'] = array (
+    '#type' => 'textfield',
+    '#title' => t('Email'),
+    '#description' => t('Please enter your email address.'),
+    '#size' => 20,
+    '#maxlength' => 40,
+    '#required' => TRUE,
+    '#attributes' => array(
+      'placeholder' => t('name@domain.com.au'),
+    ),
+  );
+
+  $form['phone'] = array (
+    '#type' => 'textfield',
+    '#title' => t('Phone'),
+    '#description' => t('Please enter your phone number including your area code.'),
+    '#size' => 12,
+    '#maxlength' => 12,
+    '#required' => TRUE,
+    '#attributes' => array(
+      'placeholder' => t('01 2345 6789'),
+    ),
+  );
+
+  $form['organisation'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Business/Organisation'),
+    '#description' => t('Please enter the name of your organisation.'),
+    '#size' => 40,
+    '#maxlength' => 40,
+    '#required' => TRUE,
+    '#attributes' => array(
+      'placeholder' => t('Business/Organisation name'),
+    ),
+  );
+
+  $form['date'] = array(
+    '#type' => 'date_select',
+    '#title' => t('Event date'),
+    '#description' => t('Please enter the date of your event.'),
+    '#required' => TRUE,
+    '#default_value' => $date_default,
+    '#date_format' => $date_format,
+    '#date_year_range' => '0:+1',
+  );
+
+  $form['event_instructions'] = array(
+    '#markup' => '<p>Please describe your event. Ensure that you include:</p>
+                  <ul><li>Why you would like the Australian Apprenticeships Ambassador to attend;</li>
+                    <li>What their role will be (e.g. speech, presentation, Q&amp;A);</li>
+                    <li>The event website (if available);</li>
+                    <li>Notable attendees;</li>
+                    <li>Expected audience numbers; and</li>
+                    <li>How you will promote the appearance.</li>
+                  </ul>',
+                  );
+
+  $form['event_details'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Leave a message/feedback'),
+    '#description' => t('Please describe your event.'),
+    '#attributes' => array(
+      'placeholder' => t('Please describe your event.'),
+    ),
+  );
+
+  // Submit button.
+  $form['submit'] = array (
+    '#type' => 'submit',
+    '#value' => 'Submit',
+  );
+
+  return $form;
+}
+
+function _generate_guid() {
+  $s = strtoupper(md5(uniqid(REQUEST_TIME, true)));
+  $guid = 
+    substr($s,0,4) . '-' .
+    substr($s,4,4);
+  return $guid;
+}
+
+function _form_builder_validate($form, &$form_state) {
+  // Validates the form.
+  $email = $form_state['values']['email'];
+  $phone = $form_state['values']['phone'];
+
+  if(!valid_email_address($email)) {
+    form_set_error('email', 'Please enter a valid email address.');
+  }
+  if (strlen($phone) > 0 && !preg_match('/^\D*0(\D*\d){9}\D*$/', $phone)) {
+    form_set_error('phone', 'Please enter a valid Australian phone number, either a landline in the format 02 xxxx xxxx or 04xx xxxx xxxx.');
+  }
+}
+
+function _form_builder_submit($form, &$form_state) {
+  drupal_set_message(t('Form submitted.'));
+  $guid = _generate_guid();
+  $query = db_insert('apprenticeships_ambassadors_form')
+    ->fields(array(
+      'time_stamp' => REQUEST_TIME,
+      'ip_address' => ip_address(),
+      'organisation' => $form_state['values']['organisation'],
+      'reference' => $guid,
+    ))
+    ->execute();
+
+  // Send two emails, one to the user, one to the owner.
+  apprenticeships_ambassadors_form_mail_send($form_state['values'], $guid, 'user');
+  apprenticeships_ambassadors_form_mail_send($form_state['values'], $guid, 'owner');
+}
+
+/**
+ * Implements hook_mail().
+ */
+
+function apprenticeships_ambassadors_form_mail($key, &$message, $params) {
+
+  $options = array(
+    'langcode' => $message['language']->language,
+  );
+
+  $headers = array(
+    'MIME-Version' => '1.0',
+    'Content-Type' => 'text/html; charset=UTF-8;',
+    'Content-Transfer-Encoding' => '8Bit',
+    'X-Mailer' => 'Drupal',
+  );
+
+  foreach ($headers as $key => $value) {
+    $message['headers'][$key] = $value;
+  }
+  $ambassador = $params['values']['ambassador_name'];
+  $name = t($params['values']['name']);
+  $email = t($params['values']['email']);
+  $phone = t($params['values']['phone']);
+  $org = t($params['values']['organisation']);
+  $date = $params['values']['date'];
+  $details = $params['values']['event_details'];
+  $reference = $params['guid'];
+  $cc = $email;
+
+  switch ($params['type']) {
+    case 'user':
+      $intro =  '<p>Thank you for sending a request to book an Australian Apprenticeships Ambassador.</p>' .
+                '<p>Your reference number for this request is <strong>' . $reference . '</strong>. Please quote this number if you need to contact us regarding your booking.</p>' .
+                '<p>The details of your request are included below for your reference.</p>';
+      break;
+    case 'owner':
+      $intro =  '<p>A request to book an Australian Apprenticeships Ambassador has been submitted.</p>' .
+                '<p>The reference number for this request is <strong>' . $reference . '</strong>. ' .
+                '<p>The details of the request are included below.</p>';
+      break;
+  }
+  
+  $body =   $intro .
+            '<ul><li><strong>Ambassador:</strong>&nbsp;' . $ambassador . '</li>' .
+            '<li><strong>Name:</strong>&nbsp;' . $name . '</li>' .
+            '<li><strong>Email:</strong>&nbsp;<a href="mailto:' . $email . '">' . $email . '</a></li>' .
+            '<li><strong>Phone:</strong>&nbsp;' . $phone . '</li>' .
+            '<li><strong>Organisation:</strong>&nbsp;' . $org . '</li>' .
+            '<li><strong>Date:</strong>&nbsp;' . $date . '</li>' .
+            '<li><strong>Details:</strong>&nbsp;' . check_plain($details) . '</li></ul>';
+  $message['subject'] = t('Australian Apprenticeships Ambassadors Booking [REF: ' . $reference . '] [SEC=UNCLASSIFIED]');
+  $message['body'][] = $body;
+}
+
+/**
+ * Implements hook_mail_send().
+ *
+ * @param array $form_values
+ *   An array of values from the contact form fields that were submitted.
+ *   
+ */
+
+function apprenticeships_ambassadors_form_mail_send($form_values, $guid, $type) {
+  $module = 'apprenticeships_ambassadors_form';
+  $key = 'apprenticeships_ambassadors_form_email_' . $type;
+
+  $params = array(
+    'values' => $form_values,
+    'guid' => $guid,
+    'type' => $type,
+  );
+  switch ($type) {
+    case 'user':
+      $to = $params['values']['email'];
+      break;
+
+    case 'owner':
+      $to =  'ApprenticeshipsAmbassadors@industry.gov.au';
+      break;
+  }
+  $from = 'ApprenticeshipsAmbassadors@industry.gov.au ';
+
+  $language = language_default();
+
+  $send = TRUE;
+
+  $result = drupal_mail($module, $key, $to, $language, $params, $from, $send);
+  if ($result['result'] == TRUE) {
+    drupal_set_message(t('Your message has been sent.'));
+  } else {
+    drupal_set_message(t('There was a problem sending your message and it has not been sent.'), 'error');
+  }
+}
