@@ -265,12 +265,17 @@ function _form_builder($form_state) {
   );
 
   $form['footer'] = array(
-    '#markup' => '<h3>Please note:</h3>
-                  <ol><li>The Department of Industry is unable to guarantee an Australian Apprenticeships Ambassador’s availability.</li>
-                  <li>The nominated Australian Apprenticeships Ambassador has the right to accept or decline each invitation.</li>
-                  <li>If an Australian Apprenticeships Ambassador is required to travel, the organisation sending the invitation will need to pay for all travel costs.</li>
-                  <li>The Department of Industry reserves the right to withdraw the invitation at any time.</li></ol>',
+    '#theme' => 'item_list',
+    '#title' => 'Please note:',
+    '#type' => 'ol',
+    '#items' => array(
+     'The Department of Industry is unable to guarantee an Australian Apprenticeships Ambassador’s availability.',
+      'The nominated Australian Apprenticeships Ambassador has the right to accept or decline each invitation.',
+      'If an Australian Apprenticeships Ambassador is required to travel, the organisation sending the invitation will need to pay for all travel costs.',
+      'The Department of Industry reserves the right to withdraw the invitation at any time.',
+    ),
   );
+
   return $form;
 }
 
