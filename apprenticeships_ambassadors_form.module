@@ -6,18 +6,26 @@
 function apprenticeships_ambassadors_form_menu() {
   $items = array();
   $items['request-an-ambassador'] = array(
-    'title' => 'Book an Australian Apprenticeships Ambassador',
+    'title' => t('Book an Australian Apprenticeships Ambassador'),
     'page callback' => '_call_form',
-    'access arguments' => array('access ambassadors request list'),
+    'access arguments' => array('access ambassadors request form'),
     'description' => 'Australian Appprenticeships Ambassador Request Form',
     'type' => MENU_CALLBACK,
   );
   $items['request-an-ambassador/submissions'] = array(
-    'title' => 'List of Ambassador requests',
+    'title' => t('List of Ambassador requests'),
     'page callback' => '_request_list_builder',
-    'access arguments' => array('access administration menu'),
+    'access arguments' => array('access ambassadors request list'),
     'description' => 'List of requests for an Australian Apprenticeships Ambassador',
     'type' => MENU_CALLBACK,
+  );
+  $items['admin/config/system/apprenticeships-ambassadors-form'] = array(
+    'title' => t('Apprenticeships Ambassadors Form Settings'),
+    'description' => 'Settings for the Apprenticeships Ambassadors Form.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_admin_form'),
+    'access arguments' => array('access ambassadors settings form'),
+    'type' => MENU_NORMAL_ITEM,
   );
   return $items;
 }
@@ -36,7 +44,26 @@ function apprenticeships_ambassadors_form_permission() {
       'title' => t('Access Ambassadors Request list'),
       'description' => t('Allow users to access the list of Apprenticeships Ambassadors requests.'),
     ),
+    'access ambassadors settings form' => array(
+      'title' => t('Access Ambassadors Settings Form'),
+      'description' => t('Allow users to access the settings form for the Apprenticeships Ambassadors form.'),
+    ),
   );
+}
+
+function _admin_form() {
+  $form = array();
+
+  $form['owner_email'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Administration email address',
+    '#default_value' => variable_get('owner_email',''),
+    '#size' => 40,
+    '#description' => t('Enter the email address to which you want the administration email to be sent. This will also act as the "From" email address.'),
+    '#required' => TRUE,
+  );
+
+  return system_settings_form($form);
 }
 
 function _call_form() {
@@ -209,15 +236,18 @@ function _form_builder($form_state) {
   );
 
   $form['event_instructions'] = array(
-    '#markup' => '<p>Please describe your event. Ensure that you include:</p>
-                  <ul><li>Why you would like the Australian Apprenticeships Ambassador to attend;</li>
-                    <li>What their role will be (e.g. speech, presentation, Q&amp;A);</li>
-                    <li>The event website (if available);</li>
-                    <li>Notable attendees;</li>
-                    <li>Expected audience numbers; and</li>
-                    <li>How you will promote the appearance.</li>
-                  </ul>',
-                  );
+    '#theme' => 'item_list',
+    '#title' => t('Please describe your event. Ensure that you include:'),
+    '#type' => 'ul',
+    '#items' => array(
+      'Why you would like the Australian Apprenticeships Ambassador to attend;',
+      'What their role will be (e.g. speech, presentation, Q&amp;A);',
+      'The event website (if available);',
+      'Notable attendees;',
+      'Expected audience numbers; and',
+      'How you will promote the appearance.',
+    ),
+  );
 
   $form['event_details'] = array(
     '#type' => 'textarea',
@@ -234,6 +264,13 @@ function _form_builder($form_state) {
     '#value' => 'Submit',
   );
 
+  $form['footer'] = array(
+    '#markup' => '<h3>Please note:</h3>
+                  <ol><li>The Department of Industry is unable to guarantee an Australian Apprenticeships Ambassador’s availability.</li>
+                  <li>The nominated Australian Apprenticeships Ambassador has the right to accept or decline each invitation.</li>
+                  <li>If an Australian Apprenticeships Ambassador is required to travel, the organisation sending the invitation will need to pay for all travel costs.</li>
+                  <li>The Department of Industry reserves the right to withdraw the invitation at any time.</li></ol>',
+  );
   return $form;
 }
 
@@ -353,10 +390,10 @@ function apprenticeships_ambassadors_form_mail_send($form_values, $guid, $type) 
       break;
 
     case 'owner':
-      $to =  'ApprenticeshipsAmbassadors@industry.gov.au';
+      $to =  variable_get('owner_email');
       break;
   }
-  $from = 'ApprenticeshipsAmbassadors@industry.gov.au ';
+  $from = variable_get('owner_email');
 
   $language = language_default();
 
@@ -364,7 +401,7 @@ function apprenticeships_ambassadors_form_mail_send($form_values, $guid, $type) 
 
   $result = drupal_mail($module, $key, $to, $language, $params, $from, $send);
   if ($result['result'] == TRUE) {
-    drupal_set_message(t('Your message has been sent.'));
+    drupal_set_message(t('Thank you for your request. We will be in touch shortly.'));
   } else {
     drupal_set_message(t('There was a problem sending your message and it has not been sent.'), 'error');
   }
